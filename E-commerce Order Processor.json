@@ -1,0 +1,475 @@
+{
+  "name": "E-commerce Order Processor",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ecommerce-order",
+        "options": {}
+      },
+      "id": "979c429c-e1f4-42d6-9fa8-51e9d2e0d524",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1168,
+        16
+      ],
+      "webhookId": "fe94a4f2-0252-4b63-8004-13ee18610834"
+    },
+    {
+      "parameters": {
+        "operation": "aggregate"
+      },
+      "id": "4a91ce5d-7d9e-46fd-8d78-814a779cd0d1",
+      "name": "Item Lists - Aggregate",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 1,
+      "position": [
+        -1120,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "id": "d9330260-b1d9-4f2f-9165-83fc3b1e68a5",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        -912,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const order = $json;  // webhook payload (with items)\nconst inventory = $items(\"Item Lists - Aggregate\")[0].json;  // merged inventory sheet\n\nlet allInStock = true;\nlet packingList = [];\nlet notifyText = \"\";\nlet emailSubject = \"\";\nlet emailBody = \"\";\n\nfor (const item of order.items) {\n  const product = inventory.find(p => p.productId === item.productId);\n  if (!product || product.stock < item.quantity) {\n    allInStock = false;\n    notifyText += `❌ Out of stock: ${item.productId} (needed ${item.quantity}, have ${product ? product.stock : 0})\\n`;\n  } else {\n    packingList.push(`${item.quantity}x ${product.productName}`);\n  }\n}\n\nif (allInStock) {\n  notifyText = `✅ Order ${order.orderId} ready. Packing List:\\n` + packingList.join(\"\\n\");\n} else {\n  emailSubject = `Stock issue for Order ${order.orderId}`;\n  emailBody = `Some items are out of stock:\\n${notifyText}`;\n}\n\nreturn [{\n  json: {\n    ...order,\n    allInStock,\n    packingList: packingList.join(\", \"),\n    notifyText,\n    emailSubject,\n    emailBody,\n    timestamp_pkt: new Date().toLocaleString(\"en-GB\", { timeZone: \"Asia/Karachi\" })\n  }\n}];\n"
+      },
+      "id": "e407ce76-314b-4181-8552-71e67ec969bd",
+      "name": "Code - Compare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -688,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.allInStock}}"
+            }
+          ]
+        }
+      },
+      "id": "3a9c703a-1cb2-4576-9d36-f385e3ed09ee",
+      "name": "IF - Stock Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "channel": "#fulfillment",
+        "text": "={{$json.notifyText}}",
+        "otherOptions": {},
+        "attachments": []
+      },
+      "id": "740a110d-e0ec-4f4e-8ea3-a6b00598b518",
+      "name": "Slack - Notify YES",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        48
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "JsmgbXBehHNZXruv",
+          "name": "Slack account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "channel": "#fulfillment",
+        "text": "={{$json.notifyText}}",
+        "otherOptions": {},
+        "attachments": []
+      },
+      "id": "35b43ea8-29d8-4f44-a750-c2e4a7fb78c8",
+      "name": "Slack - Notify NO",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        224
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "JsmgbXBehHNZXruv",
+          "name": "Slack account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "1e7a9b3c-191d-4efb-a3c9-96d20b8ef29f",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        208,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## E-commerce Order Processor",
+        "height": 80,
+        "width": 368,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -784,
+        -112
+      ],
+      "typeVersion": 1,
+      "id": "7f886bec-213d-4805-a2c0-0ad186dc323e",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1_fDcfDGQdplCSaAo-1L847OyjhNANN5hvnajTbcvMA0",
+          "mode": "list",
+          "cachedResultName": "Inventory ",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1_fDcfDGQdplCSaAo-1L847OyjhNANN5hvnajTbcvMA0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1_fDcfDGQdplCSaAo-1L847OyjhNANN5hvnajTbcvMA0/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1312,
+        256
+      ],
+      "id": "7eb8da3e-61bb-4d36-82bd-f1032644d3b2",
+      "name": "Read Inventory",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YkImVOZTFcWcrH4Q",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1RXADUzcRcjyr9jTjJd2glRx2b5gFQK1kBjFnrLFy7jY",
+          "mode": "list",
+          "cachedResultName": "FulfillmentQueue",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1RXADUzcRcjyr9jTjJd2glRx2b5gFQK1kBjFnrLFy7jY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1RXADUzcRcjyr9jTjJd2glRx2b5gFQK1kBjFnrLFy7jY/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "timestamp_pkt",
+              "displayName": "timestamp_pkt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "orderId",
+              "displayName": "orderId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "customerName",
+              "displayName": "customerName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "address",
+              "displayName": "address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "itemsCount",
+              "displayName": "itemsCount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "packingList",
+              "displayName": "packingList",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -240,
+        64
+      ],
+      "id": "1911b6fa-5d6a-4296-8eac-d7851a2315a6",
+      "name": "Append Queue",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YkImVOZTFcWcrH4Q",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": " abasitkz92@gmail.com",
+        "subject": "Stock Issue for Order {{ $json[\"orderId\" ]}}",
+        "message": "Hi Team,\n\nOrder {{ $json[\"orderId\" ]}} cannot be fulfilled because:\n- {{ $json[\"productName\" ]}} is out of stock.\n\nPlease update inventory.\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -240,
+        256
+      ],
+      "id": "d72de5b5-8d3c-4f3a-a323-c6ff0fd399d4",
+      "name": "Send a message",
+      "webhookId": "0937b519-4fe0-4717-ad98-12fa9f9858f0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "c4aR6DIveXTFOosm",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "orderId": "ORD-2001",
+          "customerName": "Abdul Basit",
+          "items": [
+            {
+              "productId": "P1001",
+              "quantity": 2
+            },
+            {
+              "productId": "P1008",
+              "quantity": 1
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Item Lists - Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code - Compare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Compare": {
+      "main": [
+        [
+          {
+            "node": "IF - Stock Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Stock Check": {
+      "main": [
+        [
+          {
+            "node": "Append Queue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - Notify YES": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - Notify NO": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Inventory": {
+      "main": [
+        [
+          {
+            "node": "Item Lists - Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Queue": {
+      "main": [
+        [
+          {
+            "node": "Slack - Notify YES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Slack - Notify NO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "8efc4c37-3dc4-47a6-a383-3aec159c87d3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f7137e24afad1336d5940e35fe4582051d3443118b53239982c51eb30049a61d"
+  },
+  "id": "9b7zxxZUsQYZ7r9Q",
+  "tags": []
+}
